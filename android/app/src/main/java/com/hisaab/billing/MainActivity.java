@@ -326,7 +326,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (recognizer != null) recognizer.destroy();
-        if (textRecognizer != null) textRecognizer.close();
+        if (textRecognizer != null) {
+            try {
+                textRecognizer.close();
+            } catch (Exception ignored) {
+                // Closing is best effort when the app is leaving.
+            }
+        }
         if (tts != null) tts.shutdown();
         if (webView != null) {
             webView.removeJavascriptInterface("HisaabAndroid");
