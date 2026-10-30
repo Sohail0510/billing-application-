@@ -12,16 +12,16 @@ export function publishStockSheet() {
 // sold to it before but has been removed. Saves the Excel file when anything changed.
 export async function markSoldUnits(voucher) {
   const s = getSnapshot();
-  const chosen = new Set();
-  if (voucher.kind === 'sale') for (const l of voucher.lines || []) for (const id of l.serialIds || []) chosen.add(id);
+  const chosen = new Map(); // unit id -> price per unit on this invoice
+  if (voucher.kind === 'sale') for (const l of voucher.lines || []) for (const id of l.serialIds || []) chosen.set(id, Number(l.price) || 0);
   const partyName = (voucher.party && voucher.party.name) || '';
   let changed = false;
   for (const u of s.units) {
     if (u.soldIn === voucher.id && !chosen.has(u.id)) {
-      await upsert('units', { ...u, status: 'in_stock', soldIn: '', invoiceNo: '', soldDate: '', partyName: '' });
+      await upsert('units', { ...u, status: 'in_stock', soldIn: '', invoiceNo: '', soldDate: '', partyName: '', soldPrice: '' });
       changed = true;
-    } else if (chosen.has(u.id) && u.soldIn !== voucher.id) {
-      await upsert('units', { ...u, status: 'sold', soldIn: voucher.id, invoiceNo: voucher.number, soldDate: voucher.date, partyName });
+    } else if (chosen.has(u.id) && (u.soldIn !== voucher.id || Number(u.soldPrice || 0) !== chosen.get(u.id))) {
+      await upsert('units', { ...u, status: 'sold', soldIn: voucher.id, invoiceNo: voucher.number, soldDate: voucher.date, partyName, soldPrice: chosen.get(u.id) });
       changed = true;
     }
   }
