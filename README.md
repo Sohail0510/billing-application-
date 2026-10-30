@@ -14,6 +14,7 @@ A GST billing and accounting app for Android, in the style of myBillBook. Everyt
 - **Reports**: Sales, Purchases, GSTR-1 (B2B, B2C Large/Small, credit notes, HSN), GSTR-3B summary, HSN summary, Profit & Loss, item-wise sales, stock summary, receivables and payables, day book and expenses. Each one shares as a spreadsheet (CSV).
 - **PDF invoices** shared straight to WhatsApp, Gmail or Drive, or saved to `Downloads/Hisaab`.
 - **Backup and restore** as a single file, plus dark mode and the Android back button.
+- **Voice assistant** (English and Hindi): tap the mic on the main screens to open a screen ("open sales report", "new payment in"), ask a question ("how much does Ali owe?", "sales this month") and hear the answer, or dictate an invoice ("invoice for Ali, 2 fans at 1500"). A dictated invoice opens in the form for you to check; nothing is saved automatically.
 
 ## Get the APK
 
@@ -54,14 +55,17 @@ The screens are a React app in `web/src`. After editing, run `node build.mjs` in
 | `web/src/screens/` | Every screen |
 | `android/app/src/main/java/…/MainActivity.java` | WebView host, file picker, back button, edge-to-edge |
 | `android/app/src/main/java/…/AppBridge.java` | Share PDF, save to Downloads, open WhatsApp links |
+| `web/src/lib/voice.js` | Voice commands (English and Hindi), spoken-invoice parsing, speech helpers |
+| `web/src/screens/Voice.jsx` | Mic button and voice sheet |
 
-Tests (need Playwright's Chromium): `npm run test:pdf` recreates invoice 621 as a PDF, and `tests/smoke.mjs` and `tests/bridge.mjs` click through the main flows against `dist/index.html`.
+Tests (need Playwright's Chromium): `npm run test:pdf` recreates invoice 621 as a PDF, and `tests/smoke.mjs` and `tests/bridge.mjs` click through the main flows against `dist/index.html`. `npm run test:voice` checks the voice commands (`tests/voice.mjs`) and the voice screens with a fake phone bridge (`tests/voice-ui.mjs`); the microphone and speech themselves need a real phone.
 
 ## Before you rely on it
 
 - **Back up regularly.** Data lives only on the phone. Uninstalling the app or clearing its storage deletes it. Use Settings → Backup & restore → Share backup file, and send it to Google Drive or to yourself on WhatsApp.
 - **GST reports are a working summary.** Check GSTR-1 and GSTR-3B totals against the GST portal or with your accountant before filing. E-invoicing (IRN/QR) and e-way bills are not included.
 - **One phone, one user.** There is no sync between devices.
+- **Voice needs internet** on most phones (Android's speech service). It asks for microphone permission the first time you use it. Telugu is not supported yet.
 - **PDF text is English (Latin script).** Names typed in Telugu, Hindi or Urdu show as `?` in the PDF, though they display fine in the app.
 - **Play Store:** the GitHub build is a debug APK for installing directly. For the Play Store, create a signing key, add a `signingConfig` to `android/app/build.gradle` and build `bundleRelease`.
 

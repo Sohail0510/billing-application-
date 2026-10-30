@@ -337,3 +337,23 @@ table.data tr.click { cursor: pointer; }
 .color-dot.on { box-shadow: 0 0 0 2px var(--accent); }
 .stock-badge { font-size: 12px; font-weight: 700; }
 @media (max-width: 360px) { .grid3 { grid-template-columns: 1fr 1fr; } .quick-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* Voice assistant: floating mic above the tab bar and the voice sheet. */
+.voice-fab {
+  position: fixed; right: var(--gutter-r);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 14px);
+  width: 54px; height: 54px; border-radius: 50%; border: 0; z-index: 20;
+  background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;
+}
+.voice { display: grid; gap: 14px; padding: 4px 0 8px; }
+.voice-mic { display: grid; justify-items: center; gap: 8px; padding: 6px 0; text-align: center; }
+.voice-big {
+  width: 84px; height: 84px; border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--accent-soft); color: var(--accent); font-size: 34px; display: inline-flex; align-items: center; justify-content: center;
+}
+.voice-big.on { background: var(--pay); color: #fff; }
+.voice-line { background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 6px; font-size: 15px; }
+.voice-line .link { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
+.voice-type { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.voice-type .btn { min-height: 44px; padding: 0 14px; }

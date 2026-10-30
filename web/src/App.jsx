@@ -16,6 +16,7 @@ import VoucherView from './screens/VoucherView.jsx';
 import { PaymentForm, ExpenseForm } from './screens/MoneyForms.jsx';
 import { Reports, ReportView } from './screens/Reports.jsx';
 import { More, BusinessForm, InvoiceSetup, Backup, Welcome } from './screens/Settings.jsx';
+import { VoiceButton } from './screens/Voice.jsx';
 
 export const CREATE_OPTIONS = [
   { label: 'Sales Invoice', icon: <LuFileText />, to: 'bill-new-sale' },
@@ -143,6 +144,7 @@ export default function App() {
   return (
     <div className={`app${tabbed ? ' with-tabs' : ''}`}>
       {resolve(route)}
+      {tabbed && <VoiceButton />}
       {tabbed && <TabBar route={route} />}
       <Overlays />
     </div>

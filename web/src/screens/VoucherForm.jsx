@@ -8,6 +8,7 @@ import { KINDS, STATES, GST_RATES, UNITS, PAYMENT_MODES, computeVoucher, compute
 import { fmtMoney, fmtQty, num, round2, todayISO, addDays, daysBetween, uid, clean } from '../lib/format.js';
 import { PartyPicker, Missing, balanceLabel } from './Parties.jsx';
 import { ItemPicker } from './Items.jsx';
+import { takeVoiceDraft } from '../lib/voice.js';
 
 const toFormLine = (l) => ({
   key: uid(), itemId: l.itemId || '', name: l.name || '', hsn: l.hsn || '', unit: l.unit || 'PCS', description: l.description || '',
@@ -56,13 +57,15 @@ function initForm(s, { kind, partyId, editId, sourceId, mode }) {
     }
   }
   const { number } = nextNumber(k, s.vouchers.filter((v) => v.kind === k));
-  const pid = src ? src.partyId : partyId;
+  // A draft prepared by the voice assistant fills the form once, when it opens.
+  const voice = !src && k === 'sale' ? takeVoiceDraft('sale') : null;
+  const pid = voice ? (voice.partyId || partyId) : src ? src.partyId : partyId;
   const p = pid ? s.parties.find((x) => x.id === pid) : null;
   return {
     kind: k, number, date: today, dueDate: KINDS[k].hasDue ? addDays(today, inv.defaultDueDays || 0) : '',
     partyId: p ? p.id : '', party: p ? partySnapshot(p) : (src ? src.party : null),
     taxState: (src && src.taxState) || (p && p.state) || biz.state || '',
-    lines: src ? (src.lines || []).map(toFormLine) : [], roundOff: inv.roundOff !== false, settled: '', fullyPaid: false,
+    lines: voice ? voice.lines.map(toFormLine) : src ? (src.lines || []).map(toFormLine) : [], roundOff: inv.roundOff !== false, settled: '', fullyPaid: false,
     paymentMode: 'Cash', notes: src && mode !== 'return' ? src.notes || '' : '', terms: inv.terms,
     refNumber: src && (mode === 'return' || mode === 'convert') ? src.number : '', sourceId: src ? src.id : '', mode,
   };

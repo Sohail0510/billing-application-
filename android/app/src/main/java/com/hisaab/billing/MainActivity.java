@@ -1,12 +1,18 @@
 package com.hisaab.billing;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.Uri;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -26,6 +32,11 @@ import android.window.OnBackInvokedDispatcher;
 
 import androidx.webkit.WebViewAssetLoader;
 
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.Locale;
+
 /**
  * Hosts the billing app (assets/www/index.html) in a WebView.
  * Pages are served from https://appassets.androidplatform.net so on-device storage (IndexedDB) persists.
@@ -34,9 +45,15 @@ public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String APP_URL = "https://" + HOST + "/assets/www/index.html";
     private static final int FILE_CHOOSER_REQUEST = 1001;
+    private static final int MIC_PERMISSION_REQUEST = 1002;
 
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
+    private SpeechRecognizer recognizer;
+    private TextToSpeech tts;
+    private String pendingListenLang;
+    private String pendingSpeech;
+    private String pendingSpeechLang;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -143,6 +160,125 @@ public class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
     }
 
+    /** Starts listening for one phrase. Needs the microphone permission, asked once. */
+    void startListening(final String lang) {
+        runOnUiThread(() -> {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                pendingListenLang = lang;
+                requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_PERMISSION_REQUEST);
+                return;
+            }
+            if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+                deliverSpeechError("Voice is not available on this phone.");
+                return;
+            }
+            if (recognizer == null) {
+                recognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                recognizer.setRecognitionListener(new SpeechListener());
+            }
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+            recognizer.startListening(intent);
+        });
+    }
+
+    /** Reads a reply aloud. The text-to-speech engine starts on first use. */
+    void speak(final String text, final String lang) {
+        runOnUiThread(() -> {
+            if (tts == null) {
+                pendingSpeech = text;
+                pendingSpeechLang = lang;
+                tts = new TextToSpeech(this, status -> {
+                    if (status != TextToSpeech.SUCCESS) {
+                        tts = null;
+                        pendingSpeech = null;
+                        return;
+                    }
+                    if (pendingSpeech != null) speakNow(pendingSpeech, pendingSpeechLang);
+                    pendingSpeech = null;
+                });
+                return;
+            }
+            speakNow(text, lang);
+        });
+    }
+
+    private void speakNow(String text, String lang) {
+        if (tts == null) return;
+        Locale locale = "hi-IN".equals(lang) ? Locale.forLanguageTag("hi-IN") : Locale.forLanguageTag("en-IN");
+        if (tts.setLanguage(locale) < TextToSpeech.LANG_AVAILABLE) tts.setLanguage(Locale.ENGLISH);
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hisaab-reply");
+    }
+
+    private void deliverSpeech(String text) {
+        webView.evaluateJavascript("window.__hisaabSpeech && window.__hisaabSpeech(" + JSONObject.quote(text) + ")", null);
+    }
+
+    private void deliverSpeechError(String message) {
+        webView.evaluateJavascript("window.__hisaabSpeechError && window.__hisaabSpeechError(" + JSONObject.quote(message) + ")", null);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode != MIC_PERMISSION_REQUEST) {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+            return;
+        }
+        String lang = pendingListenLang;
+        pendingListenLang = null;
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED && lang != null) {
+            startListening(lang);
+        } else {
+            deliverSpeechError("Microphone permission is needed. You can allow it in the phone's app settings.");
+        }
+    }
+
+    /** Translates recognizer events into the callbacks the web app listens for. */
+    private class SpeechListener implements RecognitionListener {
+        @Override public void onReadyForSpeech(Bundle params) {}
+        @Override public void onBeginningOfSpeech() {}
+        @Override public void onRmsChanged(float rmsdB) {}
+        @Override public void onBufferReceived(byte[] buffer) {}
+        @Override public void onEndOfSpeech() {}
+        @Override public void onPartialResults(Bundle partialResults) {}
+        @Override public void onEvent(int eventType, Bundle params) {}
+
+        @Override
+        public void onResults(Bundle results) {
+            ArrayList<String> list = results == null ? null : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+            if (list == null || list.isEmpty()) {
+                deliverSpeechError("I did not hear anything. Try again.");
+                return;
+            }
+            deliverSpeech(list.get(0));
+        }
+
+        @Override
+        public void onError(int error) {
+            switch (error) {
+                case SpeechRecognizer.ERROR_NO_MATCH:
+                case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                    deliverSpeechError("I did not hear anything. Try again.");
+                    break;
+                case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                    deliverSpeechError("Microphone permission is needed.");
+                    break;
+                case SpeechRecognizer.ERROR_NETWORK:
+                case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
+                    deliverSpeechError("Voice needs internet on this phone. Check your connection and try again.");
+                    break;
+                case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
+                    deliverSpeechError("Voice is busy. Try again in a moment.");
+                    break;
+                default:
+                    deliverSpeechError("Could not hear you. Try again.");
+            }
+        }
+    }
+
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
@@ -151,6 +287,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (recognizer != null) recognizer.destroy();
+        if (tts != null) tts.shutdown();
         if (webView != null) {
             webView.removeJavascriptInterface("HisaabAndroid");
             webView.destroy();

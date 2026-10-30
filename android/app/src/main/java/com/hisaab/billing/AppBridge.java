@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.speech.SpeechRecognizer;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
 
@@ -86,5 +87,23 @@ public class AppBridge {
     @JavascriptInterface
     public void openExternal(String url) {
         activity.openExternal(url);
+    }
+
+    /** True when this phone has a speech recognition service. */
+    @JavascriptInterface
+    public boolean canListen() {
+        return SpeechRecognizer.isRecognitionAvailable(activity);
+    }
+
+    /** Starts one listening session; the result comes back to window.__hisaabSpeech or window.__hisaabSpeechError. */
+    @JavascriptInterface
+    public void listen(String lang) {
+        activity.startListening(lang == null || lang.isEmpty() ? "en-IN" : lang);
+    }
+
+    /** Reads text aloud in English (en-IN) or Hindi (hi-IN). */
+    @JavascriptInterface
+    public void speak(String text, String lang) {
+        activity.speak(text == null ? "" : text, lang == null ? "en-IN" : lang);
     }
 }
