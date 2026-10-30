@@ -1,0 +1,68 @@
+# Hisaab Billing
+
+A GST billing and accounting app for Android, in the style of myBillBook. Everything is stored on the phone; no account, server or internet connection is needed.
+
+<img src="icon-512.png" width="96" alt="App icon">
+
+## What it does
+
+- **Sales invoices** that print like your current ones: tax-inclusive or exclusive prices, CGST + SGST within the state and IGST across states, HSN-wise tax summary, amount in words, round-off, received and balance amounts.
+- **Quotations** that convert to invoices in one tap, **credit notes** (sales returns) and **debit notes** (purchase returns).
+- **Purchases**, **Payment In / Payment Out** and **expenses** (with GST input credit).
+- **Parties** with GSTIN check, auto-filled state and PAN, opening balances, running statements and WhatsApp payment reminders.
+- **Items and stock**: HSN/SAC, units, GST rate, opening stock, low-stock alerts, stock movement per item.
+- **Reports**: Sales, Purchases, GSTR-1 (B2B, B2C Large/Small, credit notes, HSN), GSTR-3B summary, HSN summary, Profit & Loss, item-wise sales, stock summary, receivables and payables, day book and expenses. Each one shares as a spreadsheet (CSV).
+- **PDF invoices** shared straight to WhatsApp, Gmail or Drive, or saved to `Downloads/Hisaab`.
+- **Backup and restore** as a single file, plus dark mode and the Android back button.
+
+## Get the APK
+
+### Option 1: Let GitHub build it (no computer needed)
+
+1. Create a new repository on GitHub and upload this whole folder to it (keep the folder structure, including `.github`).
+2. GitHub runs the **Build Android APK** workflow automatically (see the **Actions** tab). It takes about 5 minutes.
+3. Open the repository's **Releases**, tap **Latest APK**, download `hisaab-billing.apk` on your phone and open it.
+4. Android asks to allow installing from your browser or Files app the first time. Allow it, then install.
+
+Every push to `main` builds a fresh APK and replaces the **Latest APK** release.
+
+### Option 2: Android Studio
+
+1. Open the `android` folder in Android Studio (Narwhal or newer).
+2. Wait for Gradle sync, then **Build → Build App Bundle(s) / APK(s) → Build APK(s)**.
+3. The APK is at `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### Option 3: Command line
+
+Needs JDK 17 and the Android SDK (platform 36).
+
+```bash
+cd web && npm install && node build.mjs   # only if you changed the app screens
+cd ../android && ./gradlew assembleDebug
+```
+
+## Changing the app
+
+The screens are a React app in `web/src`. After editing, run `node build.mjs` inside `web`: it bundles everything into one file and copies it to `android/app/src/main/assets/www/index.html`, which the Android app loads. The GitHub workflow does this step for you.
+
+| Path | What it holds |
+| --- | --- |
+| `web/src/lib/gst.js` | State codes, GST rates, GSTIN checksum, invoice arithmetic |
+| `web/src/lib/ledger.js` | Party balances, paid/unpaid status, stock |
+| `web/src/lib/reports.js` | All reports |
+| `web/src/pdf/` | Invoice PDF writer (A4, same layout as the sample) |
+| `web/src/screens/` | Every screen |
+| `android/app/src/main/java/…/MainActivity.java` | WebView host, file picker, back button, edge-to-edge |
+| `android/app/src/main/java/…/AppBridge.java` | Share PDF, save to Downloads, open WhatsApp links |
+
+Tests (need Playwright's Chromium): `npm run test:pdf` recreates invoice 621 as a PDF, and `tests/smoke.mjs` and `tests/bridge.mjs` click through the main flows against `dist/index.html`.
+
+## Before you rely on it
+
+- **Back up regularly.** Data lives only on the phone. Uninstalling the app or clearing its storage deletes it. Use Settings → Backup & restore → Share backup file, and send it to Google Drive or to yourself on WhatsApp.
+- **GST reports are a working summary.** Check GSTR-1 and GSTR-3B totals against the GST portal or with your accountant before filing. E-invoicing (IRN/QR) and e-way bills are not included.
+- **One phone, one user.** There is no sync between devices.
+- **PDF text is English (Latin script).** Names typed in Telugu, Hindi or Urdu show as `?` in the PDF, though they display fine in the app.
+- **Play Store:** the GitHub build is a debug APK for installing directly. For the Play Store, create a signing key, add a `signingConfig` to `android/app/build.gradle` and build `bundleRelease`.
+
+The invoice font is Carlito (SIL Open Font License); headings use Poppins (SIL Open Font License).

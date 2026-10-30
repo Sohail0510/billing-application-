@@ -1,0 +1,23 @@
+{
+  "name": "hisaab-billing-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hisaab Billing app UI (bundled into the Android app)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:preview": "node build.mjs --preview",
+    "test:pdf": "esbuild tests/pdf-sample.mjs --bundle --platform=node --format=esm --target=node20 --loader:.ttf=binary --outfile=dist/pdf-sample.mjs && node dist/pdf-sample.mjs dist/invoice-621.pdf",
+    "test:smoke": "node tests/smoke.mjs http://localhost:8765/index.html dist"
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-icons": "5.7.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "1.63.0"
+  }
+}
