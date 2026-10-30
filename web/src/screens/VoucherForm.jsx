@@ -74,13 +74,15 @@ function initForm(s, { kind, partyId, editId, sourceId, mode }) {
   };
 }
 
-function LineEditor({ line, onSave, onRemove, onClose, inter, stock, units = [], voucherId = '' }) {
+function LineEditor({ line, onSave, onRemove, onClose, inter, stock, units = [], voucherId = '', kind = 'sale' }) {
   const [l, setL] = useState(line);
   const [serials, setSerials] = useState(() => (line.serialIds || []).slice());
   const set = (k) => (v) => setL((x) => ({ ...x, [k]: v }));
   const c = computeLine({ ...l, qty: num(l.qty), price: num(l.price), gstRate: num(l.gstRate), discountPct: num(l.discountPct) });
   // Units of this item that are in stock, or already sold on this same invoice.
-  const candidates = l.itemId ? units.filter((u) => u.itemId === l.itemId && (u.status !== 'sold' || u.soldIn === voucherId)) : [];
+  const candidates = l.itemId && kind === 'sale' ? units.filter((u) => u.itemId === l.itemId && (u.status !== 'sold' || u.soldIn === voucherId)) : [];
+  // Serial units are added to stock by scanning, so a purchase bill must not add them again.
+  const scannedHere = kind === 'purchase' && l.itemId && units.some((u) => u.itemId === l.itemId);
   const tooMany = serials.length > num(l.qty);
   const toggleSerial = (id) => setSerials((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   return (
@@ -113,6 +115,9 @@ function LineEditor({ line, onSave, onRemove, onClose, inter, stock, units = [],
           <Field label="HSN / SAC" htmlFor="l-hsn"><TextInput id="l-hsn" value={l.hsn} onChange={(v) => set('hsn')(v.replace(/[^0-9]/g, ''))} inputMode="numeric" maxLength={8} /></Field>
           <Field label="Description" htmlFor="l-desc"><TextInput id="l-desc" value={l.description} onChange={set('description')} placeholder="Optional" /></Field>
         </div>
+        {scannedHere && (
+          <div className="banner warn">This item’s serial-numbered units are added to stock when you scan them. Only add a purchase here for quantities you have not scanned, or you will count them twice.</div>
+        )}
         {candidates.length > 0 && (
           <Field label="Serial numbers" error={tooMany ? 'More serial numbers than the quantity.' : undefined} hint={`${serials.length} of ${fmtQty(num(l.qty))} selected. Only units in stock are listed.`}>
             <div className="list">
@@ -367,6 +372,7 @@ export default function VoucherForm(props) {
           stock={editing.itemId ? d.stock.get(editing.itemId) : undefined}
           units={s.units}
           voucherId={form.id || ''}
+          kind={form.kind}
         />
       )}
     </>

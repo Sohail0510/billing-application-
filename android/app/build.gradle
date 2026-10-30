@@ -32,10 +32,3 @@ dependencies {
     // On-device text recognition for reading label photos. The Latin model is bundled, so no internet is needed.
     implementation 'com.google.mlkit:text-recognition:16.0.1'
 }
-
-// ML Kit brings older Kotlin add-on libraries (jdk7/jdk8). Kotlin 1.8+ already includes their classes in
-// kotlin-stdlib, so the old copies are dropped to avoid "Duplicate class" build errors.
-configurations.all {
-    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
-    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
-}

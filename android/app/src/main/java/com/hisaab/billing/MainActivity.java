@@ -18,7 +18,6 @@ import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -34,10 +33,7 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.window.OnBackInvokedDispatcher;
 
-import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
-
-import java.io.File;
 
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.TextRecognition;
@@ -61,7 +57,6 @@ public class MainActivity extends Activity {
 
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
-    private Uri cameraPhotoUri;
     private SpeechRecognizer recognizer;
     private TextToSpeech tts;
     private String pendingListenLang;
@@ -118,8 +113,6 @@ public class MainActivity extends Activity {
                 fileCallback = callback;
                 String[] types = params.getAcceptTypes();
                 boolean imageOnly = types != null && types.length > 0 && types[0] != null && types[0].startsWith("image/");
-                // The page asked for the camera (capture="environment"): open it directly. Otherwise, or if no camera app is found, show the picker.
-                if (imageOnly && params.isCaptureEnabled() && startCamera()) return true;
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType(imageOnly ? "image/*" : "*/*");
@@ -167,37 +160,13 @@ public class MainActivity extends Activity {
                 Uri[] result = null;
                 if (resultCode == RESULT_OK && data != null && data.getData() != null) {
                     result = new Uri[]{data.getData()};
-                } else if (resultCode == RESULT_OK && cameraPhotoUri != null) {
-                    // The camera saves the photo to the file we gave it; the camera returns no data.
-                    result = new Uri[]{cameraPhotoUri};
                 }
                 fileCallback.onReceiveValue(result);
                 fileCallback = null;
             }
-            cameraPhotoUri = null;
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
-    }
-
-    /** Opens the phone's camera app, saving the photo to a private file. Returns false if that is not possible. */
-    private boolean startCamera() {
-        try {
-            File dir = new File(getCacheDir(), "camera");
-            if (!dir.exists() && !dir.mkdirs()) return false;
-            File photo = new File(dir, "label-" + System.currentTimeMillis() + ".jpg");
-            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".files", photo);
-            Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            camera.putExtra(MediaStore.EXTRA_OUTPUT, uri);
-            camera.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            if (camera.resolveActivity(getPackageManager()) == null) return false;
-            cameraPhotoUri = uri;
-            startActivityForResult(camera, FILE_CHOOSER_REQUEST);
-            return true;
-        } catch (Exception e) {
-            cameraPhotoUri = null;
-            return false;
-        }
     }
 
     /** Starts listening for one phrase. Needs the microphone permission, asked once. */

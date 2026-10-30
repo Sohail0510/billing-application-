@@ -19,7 +19,7 @@ export function parseLabel(text) {
   return { model: pick(LABEL_MODEL), serial: pick(LABEL_SERIAL), text: t.trim() };
 }
 
-export const UNIT_HEADERS = ['Serial no', 'Model no', 'Product', 'Brand', 'HSN', 'Status', 'Invoice no', 'Date added', 'Date sold', 'Party', 'Note'];
+export const UNIT_HEADERS = ['Serial no', 'Model no', 'Product', 'Brand', 'HSN', 'Purchase price (₹)', 'Status', 'Invoice no', 'Date added', 'Date sold', 'Party', 'Note'];
 
 // One row per unit, in the order they were added.
 export function stockRows(units, items = []) {
@@ -33,6 +33,7 @@ export function stockRows(units, items = []) {
       u.productName || itemName(u.itemId),
       u.brand || '',
       u.hsn || itemHsn(u.itemId),
+      u.purchasePrice ? Number(u.purchasePrice) : '',
       u.status === 'sold' ? 'Sold' : 'In stock',
       u.invoiceNo || '',
       u.addedDate || '',
@@ -48,7 +49,7 @@ export function stockWorkbook(units, items) {
     sheetName: 'Stock',
     headers: UNIT_HEADERS,
     rows: stockRows(units, items),
-    widths: [18, 18, 30, 14, 10, 12, 14, 13, 13, 26, 24],
+    widths: [18, 18, 30, 14, 10, 16, 12, 14, 13, 13, 26, 24],
   });
 }
 

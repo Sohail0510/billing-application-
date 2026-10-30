@@ -6,9 +6,9 @@ import { upsert, remove } from '../lib/db.js';
 import { imageFileToPng, readLabelText, canReadLabels } from '../lib/platform.js';
 import { parseLabel } from '../lib/units.js';
 import { publishStockSheet } from '../lib/stockSheet.js';
-import { clean, todayISO, uid } from '../lib/format.js';
+import { clean, todayISO, uid, num } from '../lib/format.js';
 
-const blank = () => ({ itemId: '', productName: '', brand: '', model: '', serial: '', note: '' });
+const blank = () => ({ itemId: '', productName: '', brand: '', model: '', serial: '', purchasePrice: '', note: '' });
 
 export default function Scan() {
   const { s } = useData();
@@ -47,7 +47,7 @@ export default function Scan() {
 
   const save = async () => {
     if (saving) return;
-    const item = items.find((i) => i.id === form.itemId);
+    let item = items.find((i) => i.id === form.itemId);
     const productName = item ? item.name : clean(form.productName);
     const serial = clean(form.serial).toUpperCase();
     const e = {};
@@ -61,14 +61,22 @@ export default function Scan() {
     }
     setSaving(true);
     try {
+      // A product that isn't in the item list yet is added to it, so its stock is counted from now on.
+      if (!item) {
+        const same = s.items.find((i) => i.kind !== 'service' && clean(i.name).toUpperCase() === productName.toUpperCase());
+        item = same || await upsert('items', {
+          name: productName, kind: 'product', hsn: '', unit: 'PCS', gstRate: 18, salePrice: 0, saleTaxIncl: true,
+          purchasePrice: num(form.purchasePrice), purchaseTaxIncl: false, openingStock: 0, lowStock: 0, description: '',
+        });
+      }
       await upsert('units', {
-        id: uid(), itemId: item ? item.id : '', productName, brand: clean(form.brand), model: clean(form.model).toUpperCase(),
-        serial, hsn: item ? item.hsn || '' : '', note: clean(form.note), status: 'in_stock', soldIn: '', invoiceNo: '', soldDate: '',
+        id: uid(), itemId: item.id, productName: item.name, brand: clean(form.brand), model: clean(form.model).toUpperCase(),
+        serial, hsn: item.hsn || '', purchasePrice: num(form.purchasePrice), note: clean(form.note), status: 'in_stock', soldIn: '', invoiceNo: '', soldDate: '',
         partyName: '', addedDate: todayISO(), source: photo ? 'scan' : 'manual',
       });
       const msg = publishStockSheet();
       // Keep the item and brand, since the next unit is usually the same product.
-      setForm((f) => ({ ...blank(), itemId: f.itemId, productName: f.productName, brand: f.brand }));
+      setForm((f) => ({ ...blank(), itemId: f.itemId || item.id, productName: f.productName, brand: f.brand, purchasePrice: f.purchasePrice }));
       setPhoto('');
       setReadText('');
       toast(`Saved. ${msg}`);
@@ -110,7 +118,7 @@ export default function Scan() {
           )}
         </div>
 
-        <Field label="Item from your list" hint="Optional. Leave blank to type the product name." htmlFor="scan-item">
+        <Field label="Item from your list" hint="Optional. Leave blank to type the product name; a new item is added for it." htmlFor="scan-item">
           <Select id="scan-item" value={form.itemId} onChange={set('itemId')} options={[['', 'Type the product name'], ...items.map((i) => [i.id, i.name])]} />
         </Field>
         {!form.itemId && (
@@ -128,8 +136,11 @@ export default function Scan() {
         </div>
         <div className="grid2">
           <Field label="Brand" htmlFor="scan-brand"><TextInput id="scan-brand" value={form.brand} onChange={set('brand')} placeholder="Optional" /></Field>
-          <Field label="Note" htmlFor="scan-note"><TextInput id="scan-note" value={form.note} onChange={set('note')} placeholder="Optional" /></Field>
+          <Field label="Purchase price" htmlFor="scan-cost">
+            <div className="prefix-input"><span>₹</span><input id="scan-cost" className="input" inputMode="decimal" value={form.purchasePrice} onChange={(e) => set('purchasePrice')(e.target.value)} placeholder="Optional" /></div>
+          </Field>
         </div>
+        <Field label="Note" htmlFor="scan-note"><TextInput id="scan-note" value={form.note} onChange={set('note')} placeholder="Optional" /></Field>
 
         <div className="card card-pad">
           <div className="section-title" style={{ padding: 0, marginBottom: 8 }}>

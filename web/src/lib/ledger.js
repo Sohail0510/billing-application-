@@ -94,6 +94,8 @@ export function derive(s) {
   // Stock on hand for products.
   const stock = new Map();
   for (const i of s.items) if (i.kind !== 'service') stock.set(i.id, num(i.openingStock));
+  // Every scanned or typed-in serial unit is one piece added to stock; selling it is recorded by the invoice line.
+  for (const u of s.units || []) if (u.itemId && stock.has(u.itemId)) stock.set(u.itemId, stock.get(u.itemId) + 1);
   for (const v of s.vouchers) {
     const k = KINDS[v.kind];
     if (!k || !k.stock) continue;
@@ -160,6 +162,7 @@ export function partyStatement(s, partyId) {
 export function stockAsOf(s, isoDate) {
   const stock = new Map();
   for (const i of s.items) if (i.kind !== 'service') stock.set(i.id, (i.openingDate || '') <= isoDate ? num(i.openingStock) : 0);
+  for (const u of s.units || []) if (u.itemId && stock.has(u.itemId) && (u.addedDate || '') <= isoDate) stock.set(u.itemId, stock.get(u.itemId) + 1);
   for (const v of s.vouchers) {
     const k = KINDS[v.kind];
     if (!k || !k.stock || v.date > isoDate) continue;

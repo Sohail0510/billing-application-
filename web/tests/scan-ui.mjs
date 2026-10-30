@@ -53,6 +53,19 @@ await page.waitForTimeout(300);
 check(await page.locator('.toast').textContent().then((t) => t.includes('already')), 'duplicate serial is refused');
 await page.fill('#scan-serial', '');
 
+// A product not in the item list is added to it automatically.
+await page.selectOption('#scan-item', '');
+await page.fill('#scan-product', 'Test Cooler');
+await page.fill('#scan-serial', 'TC-001');
+await page.fill('#scan-cost', '4500');
+await page.getByRole('button', { name: 'Save to stock sheet' }).click();
+await page.waitForFunction(() => window.__saves.length > 1, null, { timeout: 8000 });
+await page.evaluate(() => { location.hash = 'items'; });
+await page.waitForSelector('text=Test Cooler');
+check(true, 'new product scanned with no item selected is added to the items list');
+await page.evaluate(() => { location.hash = 'scan'; });
+await page.waitForSelector('#scan-serial');
+
 // 2. Sell that unit on an invoice made by voice, then choose the serial on the line.
 await page.evaluate(() => { location.hash = 'home'; });
 await page.waitForSelector('text=To collect');
@@ -65,7 +78,7 @@ await page.getByRole('checkbox', { name: 'Serial 22A12345' }).check();
 await page.getByRole('button', { name: 'Done' }).click();
 await page.getByRole('button', { name: 'Save invoice' }).click();
 await page.waitForFunction(() => location.hash.startsWith('#doc-'), null, { timeout: 8000 });
-await page.waitForFunction(() => window.__saves.length > 1, null, { timeout: 8000 });
+await page.waitForFunction(() => window.__saves.length > 2, null, { timeout: 8000 });
 const last = await page.evaluate(() => window.__saves[window.__saves.length - 1].b64);
 writeFileSync(`${outDir}/stock-after-sale.xlsx`, Buffer.from(last, 'base64'));
 check(true, 'stock sheet updated after the invoice was saved');
@@ -73,7 +86,7 @@ check(true, 'stock sheet updated after the invoice was saved');
 // 3. Deleting the invoice puts the unit back in stock.
 await page.getByRole('button', { name: 'Delete', exact: true }).click();
 await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
-await page.waitForFunction(() => window.__saves.length > 2, null, { timeout: 8000 });
+await page.waitForFunction(() => window.__saves.length > 3, null, { timeout: 8000 });
 const afterDelete = await page.evaluate(() => window.__saves[window.__saves.length - 1].b64);
 writeFileSync(`${outDir}/stock-after-delete.xlsx`, Buffer.from(afterDelete, 'base64'));
 check(true, 'stock sheet updated after the invoice was deleted');
