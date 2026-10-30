@@ -8,7 +8,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.util.Base64;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -32,6 +35,11 @@ import android.window.OnBackInvokedDispatcher;
 
 import androidx.webkit.WebViewAssetLoader;
 
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -54,6 +62,7 @@ public class MainActivity extends Activity {
     private String pendingListenLang;
     private String pendingSpeech;
     private String pendingSpeechLang;
+    private TextRecognizer textRecognizer;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -185,6 +194,35 @@ public class MainActivity extends Activity {
         });
     }
 
+    /** Reads the text on a label photo and hands the result to the web app. Runs entirely on the phone. */
+    void recognizeLabel(final String base64) {
+        runOnUiThread(() -> {
+            try {
+                byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bitmap == null) {
+                    deliverOcrError("That photo could not be opened. Try again.");
+                    return;
+                }
+                if (textRecognizer == null) textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+                InputImage image = InputImage.fromBitmap(bitmap, 0);
+                textRecognizer.process(image)
+                        .addOnSuccessListener(result -> deliverOcr(result.getText()))
+                        .addOnFailureListener(e -> deliverOcrError("Could not read the photo. Try a clearer picture."));
+            } catch (Exception e) {
+                deliverOcrError("Could not read the photo. Try a clearer picture.");
+            }
+        });
+    }
+
+    private void deliverOcr(String text) {
+        webView.evaluateJavascript("window.__hisaabOcr && window.__hisaabOcr(" + JSONObject.quote(text == null ? "" : text) + ")", null);
+    }
+
+    private void deliverOcrError(String message) {
+        webView.evaluateJavascript("window.__hisaabOcrError && window.__hisaabOcrError(" + JSONObject.quote(message) + ")", null);
+    }
+
     /** Reads a reply aloud. The text-to-speech engine starts on first use. */
     void speak(final String text, final String lang) {
         runOnUiThread(() -> {
@@ -288,6 +326,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (recognizer != null) recognizer.destroy();
+        if (textRecognizer != null) textRecognizer.close();
         if (tts != null) tts.shutdown();
         if (webView != null) {
             webView.removeJavascriptInterface("HisaabAndroid");

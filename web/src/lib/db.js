@@ -3,8 +3,8 @@
 import { uid } from './format.js';
 
 const DB_NAME = 'hisaab-billing';
-const DB_VERSION = 1;
-export const COLLECTIONS = ['parties', 'items', 'vouchers', 'payments', 'expenses'];
+const DB_VERSION = 2;
+export const COLLECTIONS = ['parties', 'items', 'vouchers', 'payments', 'expenses', 'units'];
 
 export function defaultSettings() {
   return {
@@ -28,7 +28,7 @@ let idb = null;
 let persistent = false;
 let snapshot = {
   ready: false, persistent: false, version: 0, settings: defaultSettings(),
-  parties: [], items: [], vouchers: [], payments: [], expenses: [],
+  parties: [], items: [], vouchers: [], payments: [], expenses: [], units: [],
 };
 const listeners = new Set();
 
@@ -152,7 +152,8 @@ export function exportAll() {
 export function validateBackup(data) {
   if (!data || typeof data !== 'object') return 'This file is not a backup from this app.';
   if (data.app !== 'hisaab-billing') return 'This file is not a backup from this app.';
-  for (const c of COLLECTIONS) if (!Array.isArray(data[c])) return `The backup is missing ${c}.`;
+  // Backups made before serial-numbered stock have no units; they restore with none.
+  for (const c of COLLECTIONS) if (c !== 'units' && !Array.isArray(data[c])) return `The backup is missing ${c}.`;
   return '';
 }
 

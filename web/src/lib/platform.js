@@ -103,3 +103,41 @@ export function imageFileToPng(file, maxSide = 320) {
     reader.readAsDataURL(file);
   });
 }
+
+// ---- Label reading and the stock sheet -------------------------------------------------------
+
+// True when the Android app can read text from a photo on this phone.
+export const canReadLabels = () => Boolean(bridge() && typeof bridge().recognizeText === 'function');
+
+// Reads the text on a label photo (base64 PNG or JPEG without the data: prefix). Resolves with the text.
+export function readLabelText(base64) {
+  return new Promise((resolve, reject) => {
+    const b = bridge();
+    if (!b || typeof b.recognizeText !== 'function') {
+      reject(new Error('Reading the label works in the Android app. Type the details below.'));
+      return;
+    }
+    const done = () => { window.__hisaabOcr = null; window.__hisaabOcrError = null; };
+    window.__hisaabOcr = (text) => { done(); resolve(String(text || '')); };
+    window.__hisaabOcrError = (msg) => { done(); reject(new Error(String(msg || 'Could not read the photo.'))); };
+    try {
+      b.recognizeText(base64);
+    } catch {
+      done();
+      reject(new Error('Could not read the photo on this phone.'));
+    }
+  });
+}
+
+// Saves a file to Downloads/Hisaab, replacing the earlier copy with the same name when the Android app can.
+export function saveReplacing(bytes, fileName, mime) {
+  const b = bridge();
+  if (b && typeof b.saveReplacing === 'function') {
+    try {
+      return b.saveReplacing(bytesToBase64(bytes), fileName, mime) || 'Saved';
+    } catch (e) {
+      return 'Could not save the file: ' + (e && e.message ? e.message : 'unknown error');
+    }
+  }
+  return saveFile(bytes, fileName, mime);
+}

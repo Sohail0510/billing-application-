@@ -1,11 +1,13 @@
 package com.hisaab.billing;
 
 import android.content.ClipData;
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.database.Cursor;
 import android.provider.MediaStore;
 import android.speech.SpeechRecognizer;
 import android.util.Base64;
@@ -87,6 +89,66 @@ public class AppBridge {
     @JavascriptInterface
     public void openExternal(String url) {
         activity.openExternal(url);
+    }
+
+    /** Reads the text on a label photo; the result comes back to window.__hisaabOcr or window.__hisaabOcrError. */
+    @JavascriptInterface
+    public void recognizeText(String base64) {
+        activity.recognizeLabel(base64);
+    }
+
+    /**
+     * Saves a file to Downloads/Hisaab, replacing an earlier file with the same name so the Excel stock
+     * sheet stays a single file. Android 10+ only; older versions get the share sheet.
+     */
+    @JavascriptInterface
+    public String saveReplacing(String base64, String fileName, String mimeType) {
+        if (Build.VERSION.SDK_INT < 29) {
+            String msg = shareFile(base64, fileName, mimeType, "");
+            return msg.isEmpty() ? "Choose where to save the file" : msg;
+        }
+        String name = safeName(fileName);
+        try {
+            ContentResolver resolver = activity.getContentResolver();
+            Uri existing = findDownload(resolver, name);
+            Uri target;
+            String mode = "wt";
+            if (existing != null) {
+                target = existing;
+            } else {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+                values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Hisaab");
+                target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                mode = "w";
+            }
+            if (target == null) return "Could not save to Downloads.";
+            try (OutputStream out = resolver.openOutputStream(target, mode)) {
+                if (out == null) return "Could not save to Downloads.";
+                out.write(Base64.decode(base64, Base64.DEFAULT));
+            }
+            return (existing != null ? "Updated " : "Saved to ") + "Downloads/Hisaab/" + name;
+        } catch (Exception e) {
+            return "Could not save the file: " + e.getMessage();
+        }
+    }
+
+    /** Finds our earlier copy of a file in Downloads/Hisaab, if there is one. */
+    private static Uri findDownload(ContentResolver resolver, String name) {
+        String[] projection = {MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.RELATIVE_PATH};
+        try (Cursor c = resolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, projection,
+                MediaStore.MediaColumns.DISPLAY_NAME + " = ?", new String[]{name}, null)) {
+            if (c == null) return null;
+            while (c.moveToNext()) {
+                String path = c.getString(2);
+                if (path != null && path.startsWith(Environment.DIRECTORY_DOWNLOADS + "/Hisaab")) {
+                    long id = c.getLong(0);
+                    return android.content.ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id);
+                }
+            }
+        }
+        return null;
     }
 
     /** True when this phone has a speech recognition service. */

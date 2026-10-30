@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   LuHouse, LuReceipt, LuPlus, LuUsers, LuPackage, LuFileText, LuClipboardList, LuShoppingCart,
-  LuArrowDownLeft, LuArrowUpRight, LuWallet, LuUndo2, LuFileMinus,
+  LuArrowDownLeft, LuArrowUpRight, LuWallet, LuUndo2, LuFileMinus, LuCamera,
 } from 'react-icons/lu';
 import { useData } from './lib/useData.js';
 import { useRoute, go, back, currentRoute } from './router.js';
@@ -17,6 +17,7 @@ import { PaymentForm, ExpenseForm } from './screens/MoneyForms.jsx';
 import { Reports, ReportView } from './screens/Reports.jsx';
 import { More, BusinessForm, InvoiceSetup, Backup, Welcome } from './screens/Settings.jsx';
 import { VoiceButton } from './screens/Voice.jsx';
+import Scan from './screens/Scan.jsx';
 
 export const CREATE_OPTIONS = [
   { label: 'Sales Invoice', icon: <LuFileText />, to: 'bill-new-sale' },
@@ -28,6 +29,7 @@ export const CREATE_OPTIONS = [
   { label: 'Credit Note', icon: <LuUndo2 />, to: 'bill-new-cnote' },
   { label: 'Debit Note', icon: <LuFileMinus />, to: 'bill-new-dnote' },
   { label: 'New Party', icon: <LuUsers />, to: 'party-new' },
+  { label: 'Scan label', icon: <LuCamera />, to: 'scan' },
 ];
 
 const TABS = [
@@ -112,6 +114,7 @@ function resolve(route) {
     case 'business': return <BusinessForm />;
     case 'billsetup': return <InvoiceSetup />;
     case 'backup': return <Backup />;
+    case 'scan': return <Scan />;
     default: return <Home />;
   }
 }

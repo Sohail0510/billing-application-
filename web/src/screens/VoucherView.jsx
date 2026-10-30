@@ -6,6 +6,7 @@ import { useData } from '../lib/useData.js';
 import { go, back } from '../router.js';
 import { TopBar, Page, StatusPill, ask, toast } from '../ui.jsx';
 import { remove, upsert } from '../lib/db.js';
+import { releaseSoldUnits } from '../lib/stockSheet.js';
 import { KINDS } from '../lib/gst.js';
 import { fmtMoney, fmtDateShort } from '../lib/format.js';
 import { buildDocModel } from '../lib/docModel.js';
@@ -228,6 +229,7 @@ export default function VoucherView({ id }) {
     const ok = await ask({ title: `Delete ${k.label} ${v.number}?`, message: 'Stock and party balances will be updated. This cannot be undone.', confirmLabel: 'Delete', danger: true });
     if (!ok) return;
     await remove('vouchers', v.id);
+    await releaseSoldUnits(v.id);
     if (v.sourceId) {
       const src = s.vouchers.find((x) => x.id === v.sourceId);
       if (src && src.kind === 'quote' && src.convertedTo === v.id) await upsert('vouchers', { ...src, status: 'open', convertedTo: '' });

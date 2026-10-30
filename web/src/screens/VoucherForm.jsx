@@ -9,16 +9,19 @@ import { fmtMoney, fmtQty, num, round2, todayISO, addDays, daysBetween, uid, cle
 import { PartyPicker, Missing, balanceLabel } from './Parties.jsx';
 import { ItemPicker } from './Items.jsx';
 import { takeVoiceDraft } from '../lib/voice.js';
+import { markSoldUnits } from '../lib/stockSheet.js';
 
 const toFormLine = (l) => ({
   key: uid(), itemId: l.itemId || '', name: l.name || '', hsn: l.hsn || '', unit: l.unit || 'PCS', description: l.description || '',
   qty: String(l.qty ?? 1), price: l.price !== undefined && l.price !== '' ? String(l.price) : '', taxIncl: Boolean(l.taxIncl),
   gstRate: String(l.gstRate ?? 0), discountPct: l.discountPct ? String(l.discountPct) : '',
+  serialIds: Array.isArray(l.serialIds) ? [...l.serialIds] : [],
 });
 
 const toLine = (l) => ({
   itemId: l.itemId || '', name: clean(l.name), hsn: clean(l.hsn), unit: l.unit, description: clean(l.description),
   qty: num(l.qty), price: num(l.price), taxIncl: Boolean(l.taxIncl), gstRate: num(l.gstRate), discountPct: num(l.discountPct),
+  serialIds: Array.isArray(l.serialIds) ? l.serialIds : [],
 });
 
 const partySnapshot = (p) => (p ? {
@@ -71,10 +74,15 @@ function initForm(s, { kind, partyId, editId, sourceId, mode }) {
   };
 }
 
-function LineEditor({ line, onSave, onRemove, onClose, inter, stock }) {
+function LineEditor({ line, onSave, onRemove, onClose, inter, stock, units = [], voucherId = '' }) {
   const [l, setL] = useState(line);
+  const [serials, setSerials] = useState(() => (line.serialIds || []).slice());
   const set = (k) => (v) => setL((x) => ({ ...x, [k]: v }));
   const c = computeLine({ ...l, qty: num(l.qty), price: num(l.price), gstRate: num(l.gstRate), discountPct: num(l.discountPct) });
+  // Units of this item that are in stock, or already sold on this same invoice.
+  const candidates = l.itemId ? units.filter((u) => u.itemId === l.itemId && (u.status !== 'sold' || u.soldIn === voucherId)) : [];
+  const tooMany = serials.length > num(l.qty);
+  const toggleSerial = (id) => setSerials((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   return (
     <Sheet
       open={Boolean(line)}
@@ -82,7 +90,7 @@ function LineEditor({ line, onSave, onRemove, onClose, inter, stock }) {
       title="Item details"
       footer={<>
         <button type="button" className="btn danger" onClick={onRemove} aria-label="Remove item"><LuTrash2 /></button>
-        <button type="button" className="btn primary block" onClick={() => onSave(l)} disabled={!clean(l.name) || num(l.qty) <= 0}>Done</button>
+        <button type="button" className="btn primary block" onClick={() => onSave({ ...l, serialIds: serials.filter((id) => candidates.some((u) => u.id === id)) })} disabled={!clean(l.name) || num(l.qty) <= 0 || tooMany}>Done</button>
       </>}
     >
       <div className="form">
@@ -105,6 +113,21 @@ function LineEditor({ line, onSave, onRemove, onClose, inter, stock }) {
           <Field label="HSN / SAC" htmlFor="l-hsn"><TextInput id="l-hsn" value={l.hsn} onChange={(v) => set('hsn')(v.replace(/[^0-9]/g, ''))} inputMode="numeric" maxLength={8} /></Field>
           <Field label="Description" htmlFor="l-desc"><TextInput id="l-desc" value={l.description} onChange={set('description')} placeholder="Optional" /></Field>
         </div>
+        {candidates.length > 0 && (
+          <Field label="Serial numbers" error={tooMany ? 'More serial numbers than the quantity.' : undefined} hint={`${serials.length} of ${fmtQty(num(l.qty))} selected. Only units in stock are listed.`}>
+            <div className="list">
+              {candidates.map((u) => (
+                <label key={u.id} className="row">
+                  <input type="checkbox" checked={serials.includes(u.id)} onChange={() => toggleSerial(u.id)} aria-label={`Serial ${u.serial}`} />
+                  <span className="main">
+                    <span className="title">{u.serial}</span>
+                    <span className="meta">{u.model || 'No model no.'}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </Field>
+        )}
         <div className="card card-pad">
           <div className="kv"><span className="muted">Rate before tax</span><span>{fmtMoney(c.unitRate)}</span></div>
           {c.discountAmt > 0 && <div className="kv"><span className="muted">Discount</span><span>− {fmtMoney(c.discountAmt)}</span></div>}
@@ -170,6 +193,7 @@ export default function VoucherForm(props) {
     if (!form.date) e.date = 'Pick a date.';
     if (['purchase', 'cnote', 'dnote'].includes(form.kind) && !form.partyId) e.party = `Select the ${roleLabel}.`;
     if (!form.lines.length) e.lines = 'Add at least one item.';
+    if (form.lines.some((l) => (l.serialIds || []).length > num(l.qty))) e.lines = 'A line has more serial numbers than its quantity.';
     if (settledNum > c.total + 0.009) e.settled = 'This is more than the bill total.';
     setErrors(e);
     if (Object.keys(e).length) {
@@ -190,6 +214,7 @@ export default function VoucherForm(props) {
     if (form.sourceId) rec.sourceId = form.sourceId;
     if (form.id) rec.id = form.id;
     const saved = await upsert('vouchers', rec);
+    await markSoldUnits(saved);
     if (form.mode === 'convert' && form.sourceId) {
       const src = s.vouchers.find((v) => v.id === form.sourceId);
       if (src) await upsert('vouchers', { ...src, status: 'converted', convertedTo: saved.id });
@@ -340,6 +365,8 @@ export default function VoucherForm(props) {
           onClose={() => setEditing(null)}
           inter={c.inter}
           stock={editing.itemId ? d.stock.get(editing.itemId) : undefined}
+          units={s.units}
+          voucherId={form.id || ''}
         />
       )}
     </>

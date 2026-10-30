@@ -13,6 +13,8 @@ A GST billing and accounting app for Android, in the style of myBillBook. Everyt
 - **Items and stock**: HSN/SAC, units, GST rate, opening stock, low-stock alerts, stock movement per item.
 - **Reports**: Sales, Purchases, GSTR-1 (B2B, B2C Large/Small, credit notes, HSN), GSTR-3B summary, HSN summary, Profit & Loss, item-wise sales, stock summary, receivables and payables, day book and expenses. Each one shares as a spreadsheet (CSV).
 - **PDF invoices** shared straight to WhatsApp, Gmail or Drive, or saved to `Downloads/Hisaab`.
+- **Scan label**: take a photo of a product label and the model no. and serial no. are read on the phone (no internet). Each unit is saved in **Downloads/Hisaab/Stock.xlsx**, one row per serial number, and that file is updated every time you save a unit or sell one.
+- **Serial numbers on invoices**: when you add a line for an item, pick the units you are selling. They are marked as sold to that invoice in the stock sheet, and go back in stock if the invoice is deleted.
 - **Backup and restore** as a single file, plus dark mode and the Android back button.
 - **Voice assistant** (English and Hindi): tap the mic on the main screens to open a screen ("open sales report", "new payment in"), ask a question ("how much does Ali owe?", "sales this month") and hear the answer, or dictate an invoice ("invoice for Ali, 2 fans at 1500"). A dictated invoice opens in the form for you to check; nothing is saved automatically.
 
@@ -57,8 +59,12 @@ The screens are a React app in `web/src`. After editing, run `node build.mjs` in
 | `android/app/src/main/java/…/AppBridge.java` | Share PDF, save to Downloads, open WhatsApp links |
 | `web/src/lib/voice.js` | Voice commands (English and Hindi), spoken-invoice parsing, speech helpers |
 | `web/src/screens/Voice.jsx` | Mic button and voice sheet |
+| `web/src/lib/units.js` | Label reading (model and serial), stock rows |
+| `web/src/lib/xlsx.js` | Excel (.xlsx) writer, no dependencies |
+| `web/src/lib/stockSheet.js` | Rebuilds Stock.xlsx; marks units sold or back in stock |
+| `web/src/screens/Scan.jsx` | Scan label screen |
 
-Tests (need Playwright's Chromium): `npm run test:pdf` recreates invoice 621 as a PDF, and `tests/smoke.mjs` and `tests/bridge.mjs` click through the main flows against `dist/index.html`. `npm run test:voice` checks the voice commands (`tests/voice.mjs`) and the voice screens with a fake phone bridge (`tests/voice-ui.mjs`); the microphone and speech themselves need a real phone.
+Tests (need Playwright's Chromium): `npm run test:pdf` recreates invoice 621 as a PDF, and `tests/smoke.mjs` and `tests/bridge.mjs` click through the main flows against `dist/index.html`. `node tests/units.mjs`, `node tests/xlsx-check.mjs` and `node tests/scan-ui.mjs` check label reading, the Excel file and the scan-to-sale flow with a fake bridge; `node tests/upgrade-check.mjs` checks that an existing install upgrades without losing data. `npm run test:voice` checks the voice commands (`tests/voice.mjs`) and the voice screens with a fake phone bridge (`tests/voice-ui.mjs`); the microphone and speech themselves need a real phone.
 
 ## Before you rely on it
 

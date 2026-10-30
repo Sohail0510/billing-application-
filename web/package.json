@@ -9,7 +9,8 @@
     "build:preview": "node build.mjs --preview",
     "test:pdf": "esbuild tests/pdf-sample.mjs --bundle --platform=node --format=esm --target=node20 --loader:.ttf=binary --outfile=dist/pdf-sample.mjs && node dist/pdf-sample.mjs dist/invoice-621.pdf",
     "test:smoke": "node tests/smoke.mjs http://localhost:8765/index.html dist",
-    "test:voice": "node tests/voice.mjs && node tests/voice-ui.mjs http://localhost:8765/index.html dist"
+    "test:voice": "node tests/voice.mjs && node tests/voice-ui.mjs http://localhost:8765/index.html dist",
+    "test:stock": "node tests/units.mjs && node tests/scan-ui.mjs http://localhost:8765/index.html dist && node tests/upgrade-check.mjs http://localhost:8765/index.html"
   },
   "dependencies": {
     "pdf-lib": "1.17.1",
