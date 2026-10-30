@@ -35,10 +35,19 @@ jobs:
 
       - name: Build the APK
         working-directory: android
+        shell: bash
         run: |
+          set -o pipefail
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
           cp app/build/outputs/apk/debug/app-debug.apk ../hisaab-billing.apk
+
+      - name: Keep the build log if the build failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: gradle-build.log
 
       - name: Keep the APK with this run
         uses: actions/upload-artifact@v4
